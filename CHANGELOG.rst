@@ -1,3 +1,18 @@
+0.3.3
+----
+* Added Debug printing for all the capabilities with the toggle_debug() function
+* Added 2 functions from @streamnsight for PWM that allow for setting the period of the PWM and the Pulse Width, both in nanoseconds
+* Fixed the SPI2 overlay stuff by using the NTC overlay instead of mine.
+
+0.3.2
+----
+* Fixing issue #53 to handle the return values of the set functions in pwm_enable.
+* Start of whole library debug for #55
+
+0.3.1
+----
+* Fixing issue #50 where I broke GPIO.cleanup() and SOFTPWM.cleanup() when no input is specified.
+
 0.3.0
 ----
 * Added setmode() function for GPIO to maintain compatibility with Raspberry Pi scripts, this function literally does nothing

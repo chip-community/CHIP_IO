@@ -41,11 +41,14 @@ static PyObject *py_cleanup(PyObject *self, PyObject *args)
     char key[8];
     char *channel = NULL;
     
+    clear_error_msg();
+    
     // Channel is optional
     if (!PyArg_ParseTuple(args, "|s", &channel))
         return NULL;
                     
-    if (strcmp(channel, "") == 0) {
+    // The !channel fixes issue #50
+    if (!channel || strcmp(channel, "") == 0) {
         softpwm_cleanup();
     } else {
         if (!get_key(channel, key)) {
@@ -68,6 +71,8 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
     int polarity = 0;
     static char *kwlist[] = {"channel", "duty_cycle", "frequency", "polarity", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ffi", kwlist, &channel, &duty_cycle, &frequency, &polarity)) {
         return NULL;
     }
@@ -78,14 +83,12 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0)
-    {
+    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
         PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
         return NULL;
     }
 
-    if (frequency <= 0.0)
-    {
+    if (frequency <= 0.0) {
         PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0");
         return NULL;
     }
@@ -95,8 +98,7 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (softpwm_start(key, duty_cycle, frequency, polarity) < 0)
-    {
+    if (softpwm_start(key, duty_cycle, frequency, polarity) < 0) {
        printf("softpwm_start failed");
        char err[2000];
        snprintf(err, sizeof(err), "Error starting softpwm on pin %s (%s)", key, get_error_msg());
@@ -112,6 +114,8 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
 {
     char key[8];
     char *channel;
+
+    clear_error_msg();
 
     if (!PyArg_ParseTuple(args, "s", &channel))
         return NULL;
@@ -134,11 +138,12 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
     float duty_cycle = 0.0;
     static char *kwlist[] = {"channel", "duty_cycle", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &duty_cycle))
         return NULL;
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0)
-    {
+    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
         PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
         return NULL;
     }
@@ -164,11 +169,12 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
     float frequency = 1.0;
     static char *kwlist[] = {"channel", "frequency", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &frequency))
         return NULL;
 
-    if ((frequency <= 0.0) || (frequency > 10000.0))
-    {
+    if ((frequency <= 0.0) || (frequency > 10000.0)) {
         PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0 and less than 10000.0");
         return NULL;
     }
@@ -194,12 +200,11 @@ PyMethodDef pwm_methods[] = {
     { "set_duty_cycle", (PyCFunction)py_set_duty_cycle, METH_VARARGS, "Change the duty cycle\ndutycycle - between 0.0 and 100.0" },
     { "set_frequency", (PyCFunction)py_set_frequency, METH_VARARGS, "Change the frequency\nfrequency - frequency in Hz (freq > 0.0)" },
     { "cleanup", (PyCFunction)py_cleanup, METH_VARARGS, "Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection"},
-    //{"setwarnings", py_setwarnings, METH_VARARGS, "Enable or disable warning messages"},
     {NULL, NULL, 0, NULL}
 };
 
 #if PY_MAJOR_VERSION > 2
-static struct PyModuleDef chippwmmodule = {
+static struct PyModuleDef chipspwmmodule = {
     PyModuleDef_HEAD_INIT,
     "SOFTPWM",       // name of module
     moduledocstring,  // module documentation, may be NULL
@@ -217,7 +222,7 @@ PyMODINIT_FUNC initSOFTPWM(void)
     PyObject *module = NULL;
 
 #if PY_MAJOR_VERSION > 2
-    if ((module = PyModule_Create(&chippwmmodule)) == NULL)
+    if ((module = PyModule_Create(&chipspwmmodule)) == NULL)
        return NULL;
 #else
     if ((module = Py_InitModule3("SOFTPWM", pwm_methods, moduledocstring)) == NULL)

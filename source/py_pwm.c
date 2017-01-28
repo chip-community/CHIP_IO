@@ -47,7 +47,7 @@ static PyObject *py_cleanup(PyObject *self, PyObject *args)
 static PyObject *py_toggle_debug(PyObject *self, PyObject *args)
 {
     // toggle debug printing
-    pwm_toggle_debug();
+    toggle_debug();
 
     Py_RETURN_NONE;
 }
@@ -62,6 +62,8 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
     int polarity = 0;
     static char *kwlist[] = {"channel", "duty_cycle", "frequency", "polarity", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ffi", kwlist, &channel, &duty_cycle, &frequency, &polarity)) {
         return NULL;
     }
@@ -71,14 +73,12 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0)
-    {
+    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
         PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
         return NULL;
     }
 
-    if (frequency <= 0.0)
-    {
+    if (frequency <= 0.0) {
         PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0");
         return NULL;
     }
@@ -88,8 +88,12 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (!pwm_start(key, duty_cycle, frequency, polarity))
+    if (pwm_start(key, duty_cycle, frequency, polarity) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Unable to start PWM: %s (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
+    }
 
     Py_RETURN_NONE;
 }
@@ -100,6 +104,8 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
     char key[8];
     char *channel;
 
+    clear_error_msg();
+
     if (!PyArg_ParseTuple(args, "s", &channel))
         return NULL;
 
@@ -108,7 +114,12 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
         return NULL;
     }
 
-    pwm_disable(key);
+    if (pwm_disable(key) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
     Py_RETURN_NONE;
 }
@@ -121,11 +132,12 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
     float duty_cycle = 0.0;
     static char *kwlist[] = {"channel", "duty_cycle", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &duty_cycle))
         return NULL;
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0)
-    {
+    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
         PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
         return NULL;
     }
@@ -136,7 +148,50 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     if (pwm_set_duty_cycle(key, duty_cycle) == -1) {
-        PyErr_SetString(PyExc_RuntimeError, "You must start() the PWM channel first");
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+// python method PWM.set_pulse_width(channel, pulse_width_ns)
+static PyObject *py_set_pulse_width_ns(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    char key[8];
+    char *channel;
+    unsigned long pulse_width_ns = 0.0;
+    unsigned long period_ns;
+    static char *kwlist[] = {"channel", "pulse_width_ns", NULL};
+
+    clear_error_msg();
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|k", kwlist, &channel, &pulse_width_ns))
+        return NULL;
+
+    if (!get_pwm_key(channel, key)) {
+        PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    // Get the period out of the data struct
+    int rtn = pwm_get_period_ns(key, &period_ns);
+    if (rtn == -1) {
+        PyErr_SetString(PyExc_ValueError, "period unable to be obtained");
+        return NULL;
+    }
+
+	if (pulse_width_ns < 0.0 || pulse_width_ns > period_ns) {
+        PyErr_SetString(PyExc_ValueError, "pulse width must have a value from 0 to period");
+        return NULL;
+    }
+
+    if (pwm_set_pulse_width_ns(key, pulse_width_ns) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -151,11 +206,12 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
     float frequency = 1.0;
     static char *kwlist[] = {"channel", "frequency", NULL};
 
+    clear_error_msg();
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &frequency))
         return NULL;
 
-    if (frequency <= 0.0)
-    {
+    if (frequency <= 0.0) {
         PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0");
         return NULL;
     }
@@ -165,14 +221,48 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (pwm_set_frequency(key, frequency) == -1) {
-        PyErr_SetString(PyExc_RuntimeError, "You must start() the PWM channel first");
+    if (pwm_set_frequency(key, frequency) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
     Py_RETURN_NONE;
 }
 
+// python method PWM.set_period_ns(channel, period_ns)
+static PyObject *py_set_period_ns(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    char key[8];
+    char *channel;
+    unsigned long period_ns = 2e6;
+    static char *kwlist[] = {"channel", "period_ns", NULL};
+
+    clear_error_msg();
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|k", kwlist, &channel, &period_ns))
+        return NULL;
+
+    if (period_ns <= 0) {
+        PyErr_SetString(PyExc_ValueError, "period must be greater than 0ns");
+        return NULL;
+    }
+
+    if (!get_pwm_key(channel, key)) {
+        PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    if (pwm_set_period_ns(key, period_ns) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
 
 static const char moduledocstring[] = "Hardware PWM functionality of a CHIP using Python";
 
@@ -181,9 +271,10 @@ PyMethodDef pwm_methods[] = {
     {"stop", (PyCFunction)py_stop_channel, METH_VARARGS | METH_KEYWORDS, "Stop the PWM channel.  channel can be in the form of 'PWM0', or 'U13_18'"},
     {"set_duty_cycle", (PyCFunction)py_set_duty_cycle, METH_VARARGS, "Change the duty cycle\ndutycycle - between 0.0 and 100.0" },
     {"set_frequency", (PyCFunction)py_set_frequency, METH_VARARGS, "Change the frequency\nfrequency - frequency in Hz (freq > 0.0)" },
+    {"set_period_ns", (PyCFunction)py_set_period_ns, METH_VARARGS, "Change the period\nperiod_ns - period in nanoseconds" },
+    {"set_pulse_width_ns", (PyCFunction)py_set_pulse_width_ns, METH_VARARGS, "Change the period\npulse_width_ns - pulse width in nanoseconds" },
     {"cleanup", py_cleanup, METH_VARARGS, "Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection"},
     {"toggle_debug", py_toggle_debug, METH_VARARGS, "Toggles the enabling/disabling of Debug print output"},
-    //{"setwarnings", py_setwarnings, METH_VARARGS, "Enable or disable warning messages"},
     {NULL, NULL, 0, NULL}
 };
 
