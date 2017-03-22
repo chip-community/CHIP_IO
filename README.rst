@@ -2,39 +2,39 @@ CHIP_IO
 ============================
 A CHIP GPIO library
 
-NOTE: Now requires the custom DTC to install the library
-
-Manual::
+Manual Installation::
 
 For Python2.7::
 
     sudo apt-get update
     sudo apt-get install git build-essential python-dev python-pip flex bison chip-dt-overlays -y
-    git clone https://github.com/atenart/dtc.git
-    cd dtc
-    make
-    sudo  make install PREFIX=/usr
-    cd ..
     git clone git://github.com/xtacocorex/CHIP_IO.git
     cd CHIP_IO
     sudo python setup.py install
     cd ..
-    sudo rm -rf CHIP_IO
 
 For Python3::
 
     sudo apt-get update
     sudo apt-get install git build-essential python3-dev python3-pip flex bison chip-dt-overlays -y
-    git clone https://github.com/atenart/dtc.git
-    cd dtc
-    make
-    sudo  make install PREFIX=/usr
-    cd ..
     git clone git://github.com/xtacocorex/CHIP_IO.git
     cd CHIP_IO
     sudo python3 setup.py install
     cd ..
-    sudo rm -rf CHIP_IO
+
+PyPi Installation::
+
+For Python2.7::
+
+    sudo apt-get update
+    sudo apt-get install git build-essential python-dev python-pip flex bison chip-dt-overlays -y
+    sudo pip install CHIP-IO
+
+For Python3::
+
+    sudo apt-get update
+    sudo apt-get install git build-essential python3-dev python3-pip flex bison chip-dt-overlays -y
+    sudo pip3 install CHIP-IO
 
 **Usage**
 
@@ -46,113 +46,115 @@ All scripts that require GPIO, PWM (HW and/or SW), and Overlay Manager need to b
 
 The following "table" is the allowable pin names that are able to be used by the library. The Name column is the normal name used on the CHIP Headers, the Alt Name column is the value used by the PocketCHIP header (if it's broken out), and the Key is the Header and Pin Number the the Pin is physically located.  Either of these 3 means is able to specify a pin in CHIP_IO.
 
-  +------------------+--------------------------+--------+
-  |   CHIP (Name)    |  PocketCHIP (Alt Name)   |  Key   |
-  +------------------+--------------------------+--------+
-  | TWI1-SDA         | KPD-I2C-SDA              | U13_9  |
-  +------------------+--------------------------+--------+
-  | TWI1-SCK         | KPD-I2C-SCL              | U13_11 |
-  +------------------+--------------------------+--------+
-  | LCD-D2           | LCD-D2                   | U13_17 |
-  +------------------+--------------------------+--------+
-  | PWM0             | PWM0                     | U13_18 |
-  +------------------+--------------------------+--------+
-  | LCD-D4           | LCD-D4                   | U13_19 |
-  +------------------+--------------------------+--------+
-  | LCD-D3           | LCD-D3                   | U13_20 |
-  +------------------+--------------------------+--------+
-  | LCD-D6           | LCD-D6                   | U13_21 |
-  +------------------+--------------------------+--------+
-  | LCD-D5           | LCD-D5                   | U13_22 |
-  +------------------+--------------------------+--------+
-  | LCD-D10          | LCD-D10                  | U13_23 |
-  +------------------+--------------------------+--------+
-  | LCD-D7           | LCD-D7                   | U13_24 |
-  +------------------+--------------------------+--------+
-  | LCD-D12          | LCD-D12                  | U13_25 |
-  +------------------+--------------------------+--------+
-  | LCD-D11          | LCD-D11                  | U13_26 |
-  +------------------+--------------------------+--------+
-  | LCD-D14          | LCD-D14                  | U13_27 |
-  +------------------+--------------------------+--------+
-  | LCD-D13          | LCD-D13                  | U13_28 |
-  +------------------+--------------------------+--------+
-  | LCD-D18          | LCD-D18                  | U13_29 |
-  +------------------+--------------------------+--------+
-  | LCD-D15          | LCD-D15                  | U13_30 |
-  +------------------+--------------------------+--------+
-  | LCD-D20          | LCD-D20                  | U13_31 |
-  +------------------+--------------------------+--------+
-  | LCD-D19          | LCD-D19                  | U13_32 |
-  +------------------+--------------------------+--------+
-  | LCD-D22          | LCD-D22                  | U13_33 |
-  +------------------+--------------------------+--------+
-  | LCD-D21          | LCD-D21                  | U13_34 |
-  +------------------+--------------------------+--------+
-  | LCD-CLK          | LCD-CLK                  | U13_35 |
-  +------------------+--------------------------+--------+
-  | LCD-D23          | LCD-D23                  | U13_36 |
-  +------------------+--------------------------+--------+
-  | LCD-VSYNC        | LCD-VSYNC                | U13_37 |
-  +------------------+--------------------------+--------+
-  | LCD-HSYNC        | LCD-HSYNC                | U13_38 |
-  +------------------+--------------------------+--------+
-  | LCD-DE           | LCD-DE                   | U13_40 |
-  +------------------+--------------------------+--------+
-  | UART1-TX         | UART-TX                  | U14_3  |
-  +------------------+--------------------------+--------+
-  | UART1-RX         | UART-RX                  | U14_5  |
-  +------------------+--------------------------+--------+
-  | LRADC            | ADC                      | U14_11 |
-  +------------------+--------------------------+--------+
-  | XIO-P0           | XIO-P0                   | U14_13 |
-  +------------------+--------------------------+--------+
-  | XIO-P1           | XIO-P1                   | U14_14 |
-  +------------------+--------------------------+--------+
-  | XIO-P2           | GPIO1                    | U14_15 |
-  +------------------+--------------------------+--------+
-  | XIO-P3           | GPIO2                    | U14_16 |
-  +------------------+--------------------------+--------+
-  | XIO-P4           | GPIO3                    | U14_17 |
-  +------------------+--------------------------+--------+
-  | XIO-P5           | GPIO4                    | U14_18 |
-  +------------------+--------------------------+--------+
-  | XIO-P6           | GPIO5                    | U14_19 |
-  +------------------+--------------------------+--------+
-  | XIO-P7           | GPIO6                    | U14_20 |
-  +------------------+--------------------------+--------+
-  | AP-EINT1         | KPD-INT                  | U14_23 |
-  +------------------+--------------------------+--------+
-  | AP-EINT3         | AP-INT3                  | U14_24 |
-  +------------------+--------------------------+--------+
-  | TWI2-SDA         | I2C-SDA                  | U14_25 |
-  +------------------+--------------------------+--------+
-  | TWI2-SCK         | I2C-SCL                  | U14_26 |
-  +------------------+--------------------------+--------+
-  | CSIPCK           | SPI-SEL                  | U14_27 |
-  +------------------+--------------------------+--------+
-  | CSICK            | SPI-CLK                  | U14_28 |
-  +------------------+--------------------------+--------+
-  | CSIHSYNC         | SPI-MOSI                 | U14_29 |
-  +------------------+--------------------------+--------+
-  | CSIVSYNC         | SPI-MISO                 | U14_30 |
-  +------------------+--------------------------+--------+
-  | CSID0            | CSID0                    | U14_31 |
-  +------------------+--------------------------+--------+
-  | CSID1            | CSID1                    | U14_32 |
-  +------------------+--------------------------+--------+
-  | CSID2            | CSID2                    | U14_33 |
-  +------------------+--------------------------+--------+
-  | CSID3            | CSID3                    | U14_34 |
-  +------------------+--------------------------+--------+
-  | CSID4            | CSID4                    | U14_35 |
-  +------------------+--------------------------+--------+
-  | CSID5            | CSID5                    | U14_36 |
-  +------------------+--------------------------+--------+
-  | CSID6            | CSID6                    | U14_37 |
-  +------------------+--------------------------+--------+
-  | CSID7            | CSID7                    | U14_38 |
-  +------------------+--------------------------+--------+
+  +------------------+--------------------------+-------------+-----------------+
+  |   CHIP (Name)    | PocketCHIP/CHIP Pro Name | CHIP Key    | HW Support      |
+  +------------------+--------------------------+-------------+-----------------+
+  | TWI1-SDA         | KPD-I2C-SDA              | U13_9       | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | TWI1-SCK         | KPD-I2C-SCL              | U13_11      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D2           | UART2-TX                 | U13_17      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | PWM0             | PWM0                     | U13_18      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | PWM1             | PWM1                     | EINT13      | CHIP PRO        |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D4           | UART2-CTS                | U13_19      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D3           | UART2-RX                 | U13_20      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D6           | LCD-D6                   | U13_21      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D5           | UART2-RTS                | U13_22      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D10          | LCD-D10                  | U13_23      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D7           | LCD-D7                   | U13_24      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D12          | LCD-D12                  | U13_25      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D11          | LCD-D11                  | U13_26      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D14          | LCD-D14                  | U13_27      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D13          | LCD-D13                  | U13_28      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D18          | LCD-D18                  | U13_29      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D15          | LCD-D15                  | U13_30      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D20          | LCD-D20                  | U13_31      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D19          | LCD-D19                  | U13_32      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D22          | LCD-D22                  | U13_33      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D21          | LCD-D21                  | U13_34      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-CLK          | LCD-CLK                  | U13_35      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-D23          | LCD-D23                  | U13_36      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-VSYNC        | LCD-VSYNC                | U13_37      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-HSYNC        | LCD-HSYNC                | U13_38      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | LCD-DE           | LCD-DE                   | U13_40      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | UART1-TX         | UART-TX                  | U14_3       | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | UART1-RX         | UART-RX                  | U14_5       | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | LRADC            | ADC                      | U14_11      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P0           | XIO-P0                   | U14_13      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P1           | XIO-P1                   | U14_14      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P2           | GPIO1                    | U14_15      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P3           | GPIO2                    | U14_16      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P4           | GPIO3                    | U14_17      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P5           | GPIO4                    | U14_18      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P6           | GPIO5                    | U14_19      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | XIO-P7           | GPIO6                    | U14_20      | CHIP            |
+  +------------------+--------------------------+-------------+-----------------+
+  | AP-EINT1         | KPD-INT                  | U14_23      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | AP-EINT3         | AP-INT3                  | U14_24      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | TWI2-SDA         | I2C-SDA                  | U14_25      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | TWI2-SCK         | I2C-SCL                  | U14_26      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSIPCK           | SPI-SEL                  | U14_27      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSICK            | SPI-CLK                  | U14_28      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSIHSYNC         | SPI-MOSI                 | U14_29      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSIVSYNC         | SPI-MISO                 | U14_30      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID0            | D0                       | U14_31      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID1            | D1                       | U14_32      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID2            | D2                       | U14_33      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID3            | D3                       | U14_34      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID4            | D4                       | U14_35      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID5            | D5                       | U14_36      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID6            | D6                       | U14_37      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
+  | CSID7            | D7                       | U14_38      | CHIP/CHIP PRO   |
+  +------------------+--------------------------+-------------+-----------------+
 
 **GPIO Setup**
 
@@ -169,12 +171,19 @@ You can also refer to the bin based upon its alternate name::
 
     GPIO.setup("GPIO1", GPIO.IN)
 
-**GPIO Debug**
+**GPIO Miscellaneous**
 
 Debug can be enabled/disabled by the following command::
 
     # Enable Debug
     GPIO.toggle_debug()
+    
+You can determine if the hardware is a CHIP/CHIP Pro using the following::
+
+    # Determine hardware
+    # 0 For CHIP
+    # 1 For CHIP Pro
+    GPIO.is_chip_pro()
 
 **GPIO Output**
 
@@ -191,12 +200,40 @@ Inputs work similarly to outputs.::
     import CHIP_IO.GPIO as GPIO
     GPIO.setup("CSID0", GPIO.IN)
 
+Other options when setting up pins::
+
+    # Specify pull up/pull down settings on a pin
+    GPIO.setup("CSID0", GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    # Specify initial value for an output
+    GPIO.setup("CSID0", GPIO.OUT, initial=1)
+    
+Pull Up/Down values are only for pins that are provided by the R8, the XIO are not capable of this.  The allowable values are: PUD_OFF, PUD_UP, and PUD_DOWN.
+
 Polling inputs::
 
     if GPIO.input("CSID0"):
         print("HIGH")
     else:
         print("LOW")
+
+Read lots of data::
+
+    # Get 8 bits of data in one shot
+    mybyte = GPIO.read_byte("LCD-D3")
+    # Get 16 bits of data in one shot
+    myword = GPIO.read_word("XIO-P4")
+
+This code was initially added by brettcvz and I cleaned it up and expanded it.
+
+You can quickly change a pins direction::
+
+    GPIO.direction("XIO-P3", GPIO.OUT)
+    GPIO.direction("XIO-P3", GPIO.IN)
+    
+You can also re-setup a pin in order to change direction, not that this is a slower operation::
+
+    GPIO.setup("XIO-P3", GPIO.OUT)
+    GPIO.setup("XIO-P3", GPIO.IN)
 
 The edge detection code below only works for the AP-EINT1, AP-EINT3, and XPO Pins on the CHIP.
 
@@ -213,19 +250,21 @@ Detecting events::
     if GPIO.event_detected("XIO-P0"):
         print "event detected!"
 
-CHIP_IO can also handle adding callback functions on any pin that supports edge detection.::
+CHIP_IO can also handle adding callback functions on any pin that supports edge detection.  Note that only one callback function can be specified per Pin, if you try to set more, an exception will be thrown.::
 
     def mycallback(channel):
         print("we hit the edge we want")
 
     GPIO.setup("GPIO3", GPIO.IN)
-    # Add Callback: Falling Edge
-    GPIO.add_event_callback("GPIO3", GPIO.FALLING, mycallback)
-    # Add Callback: Rising Edge
-    GPIO.add_event_callback("GPIO3", GPIO.RISING, mycallback)
-    # Add Callback: Both Edges
-    GPIO.add_event_callback("GPIO3", GPIO.BOTH, mycallback)
-    # Remove callback
+    # Add Event Detect and Callback Separately for Falling Edge
+    GPIO.add_event_detect("GPIO3", GPIO.FALLING)
+    GPIO.add_event_callback("GPIO3", mycallback)
+    # Add Event Detect and Callback Separately for Rising Edge
+    GPIO.add_event_detect("GPIO3", GPIO.RISING)
+    GPIO.add_event_callback("GPIO3", mycallback)
+    # Add Callback for Both Edges using the add_event_detect() method
+    GPIO.add_event_detect("GPIO3", GPIO.BOTH, mycallback)
+    # Remove callback with the following
     GPIO.remove_event_detect("GPIO3")
 
 
@@ -243,6 +282,10 @@ To clean up the GPIO when done, do the following::
 Hardware PWM requires a DTB Overlay loaded on the CHIP to allow the kernel to know there is a PWM device available to use.
 ::
     import CHIP_IO.PWM as PWM
+    # Determine hardware
+    # 0 For CHIP
+    # 1 For CHIP Pro
+    PWM.is_chip_pro()
     # Enable/Disable Debug
     PWM.toggle_debug()
     #PWM.start(channel, duty, freq=2000, polarity=0)
@@ -259,6 +302,10 @@ Hardware PWM requires a DTB Overlay loaded on the CHIP to allow the kernel to kn
 **SOFTPWM**::
 
     import CHIP_IO.SOFTPWM as SPWM
+    # Determine hardware
+    # 0 For CHIP
+    # 1 For CHIP Pro
+    SPWM.is_chip_pro()
     # Enable/Disable Debug
     SPWM.toggle_debug()
     #SPWM.start(channel, duty, freq=2000, polarity=0)
@@ -269,16 +316,36 @@ Hardware PWM requires a DTB Overlay loaded on the CHIP to allow the kernel to kn
     SPWM.set_frequency("XIO-P7", 10)
     # To Stop SPWM
     SPWM.stop("XIO-P7")
-    # Cleanup can have no argument to clean up all SoftPWM outputs
+    # Cleanup
     SPWM.cleanup()
-    # Or you can specify a single SoftPWM output to cleanup (keeping the rest intact)
-    SPWM.cleanup("XIO-P7")
     #For specific polarity: this example sets polarity to 1 on start:
     SPWM.start("XIO-P7", 50, 2000, 1)
 
 Use SOFTPWM at low speeds (hundreds of Hz) for the best results. Do not use for anything that needs high precision or reliability.
 
 If using SOFTPWM and PWM at the same time, import CHIP_IO.SOFTPWM as SPWM or something different than PWM as to not confuse the library.
+
+**SERVO**::
+
+    import CHIP_IO.SERVO as SERVO
+    # Determine hardware
+    # 0 For CHIP
+    # 1 For CHIP Pro
+    SERVO.is_chip_pro()
+    # Enable/Disable Debug
+    SERVO.toggle_debug()
+    #SPWM.start(channel, angle=0, range=180)
+    #angle values are between +/- range/2)
+    #you can choose any pin except the XIO's
+    SERVO.start("CSID4", 50)
+    SERVO.set_angle("CSID4", 25.5)
+    SERVO.set_range("CSID4", 90)
+    # To Stop Servo
+    SERVO.stop("CSID4")
+    # Cleanup
+    SERVO.cleanup()
+
+The Software Servo control only works on the LCD and CSI pins.  The XIO is too slow to control.
 
 **LRADC**::
 
@@ -316,9 +383,9 @@ SPI requires a DTB Overlay to access.  CHIP_IO does not contain any SPI specific
 **Overlay Manager**::
 
 The Overlay Manager enables you to quickly load simple Device Tree Overlays.  The options for loading are:
-PWM0, SPI2, I2C1, CUST
+PWM0, SPI2, CUST.  The Overlay Manager is smart enough to determine if you are trying to load PWM on a CHIP Pro and will fail due to the base DTB for the CHIP Pro supporting PWM0/1 out of the box.
 
-Only one of each type of overlay can be loaded at a time, but all three options can be loaded simultaneously.  So you can have SPI2 and I2C1 without PWM0, but you cannot have SPI2 loaded twice.
+Only one of each type of overlay can be loaded at a time, but all three options can be loaded simultaneously.  So you can have SPI2 without PWM0, but you cannot have SPI2 loaded twice.
 ::
     import CHIP_IO.OverlayManager as OM
     # The toggle_debug() function turns on/off debug printing
@@ -367,6 +434,9 @@ To use the utilities, here is sample code::
     UT.get_1v8_pin_voltage()
     # Unexport Everything
     UT.unexport_all()
+    # Determine if you are running a CHIP/CHIP Pro
+    # This returns True if the computer is a CHIP Pro and False if it is a CHIP
+    UT.is_chip_pro()
 
 **Running tests**
 
@@ -380,11 +450,12 @@ Install py.test to run the tests. You'll also need the python compiler package f
 To run the tests, do the following.::
 
     # If only one version of Python is installed
-    sudo py.test
-    # If more than one version of Python
-    cd test
-    sudo python2 -m pytest
-    sudo python3 -m pytest
+    # Python 2
+    sudo make pytest2
+    # Python 3
+    sudo make pytest3
+    # If more than one version of Python, run through both
+    sudo make test
 
 **Credits**
 

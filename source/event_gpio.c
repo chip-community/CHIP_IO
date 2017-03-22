@@ -38,16 +38,22 @@ SOFTWARE.
 
 #include <pthread.h>
 #include <sys/epoll.h>
+#include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <stdint.h>
 #include "event_gpio.h"
 #include "common.h"
 
 const char *stredge[4] = {"none", "rising", "falling", "both"};
+
+// Memory Map for PUD
+uint8_t *memmap;
 
 // file descriptors
 struct fdx
@@ -85,6 +91,63 @@ dyn_int_array_t *event_occurred = NULL;
 int thread_running = 0;
 int epfd = -1;
 
+// Thanks to WereCatf and Chippy-Gonzales for the Memory Mapping code/help
+int map_pio_memory()
+{
+    if (DEBUG)
+        printf(" ** map_pio_memory: opening /dev/mem **\n");
+    int fd = open("/dev/mem", O_RDWR|O_SYNC);
+	if(fd < 0) {
+        char err[256];
+        snprintf(err, sizeof(err), "map_pio_memory: could not open /dev/mem (%s)", strerror(errno));
+        add_error_msg(err);
+        return -1;
+	}
+	// uint32_t addr = 0x01c20800 & ~(getpagesize() - 1);
+	//Requires memmap to be on pagesize-boundary
+	if (DEBUG)
+        printf(" ** map_pio_memory: mapping memory **\n");
+	memmap = (uint8_t *)mmap(NULL, getpagesize()*2, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0x01C20000);
+	if(memmap == NULL) {
+        char err[256];
+        snprintf(err, sizeof(err), "map_pio_memory: mmap failed (%s)", strerror(errno));
+        add_error_msg(err);
+        return -1;
+	}
+	close(fd);
+
+	//Set memmap to point to PIO-registers
+	if (DEBUG)
+        printf(" ** map_pio_memory: moving to pio registers **\n");
+	memmap=memmap+0x800;
+	
+	return 0;
+}
+
+int gpio_get_pud(int port, int pin)
+{
+	if (DEBUG)
+        printf(" ** gpio_get_pud: port %d, pin %d **\n", port, pin);
+	volatile uint32_t *pioMem32, *configRegister;
+	pioMem32=(uint32_t *)(memmap+port*0x24+0x1c); //0x1c == pull-register
+	configRegister=pioMem32+(pin >> 4);
+	return *configRegister >> ((pin & 15) * 2) & 3;
+}
+
+int gpio_set_pud(int port, int pin, uint8_t value)
+{
+	if (DEBUG)
+        printf(" ** gpio_set_pud: port %d, pin %d, value %d **\n", port, pin, value);
+	value &= 3;
+	volatile uint32_t *pioMem32, *configRegister;
+	uint32_t mask;
+	pioMem32=(uint32_t *)(memmap+port*0x24+0x1c); //0x1c == pull-register
+	configRegister=pioMem32+(pin >> 4);
+	mask = ~(3 << ((pin & 15) * 2));
+	*configRegister &= mask;
+	*configRegister |= value << ((pin & 15) * 2);
+	return 0;
+}
 
 int gpio_export(int gpio)
 {
@@ -114,12 +177,12 @@ int gpio_export(int gpio)
         char err[256];
         snprintf(err, sizeof(err), "gpio_export: could not write '%s' to %s (%s)", str_gpio, filename, strerror(e_no));
         add_error_msg(err);
-        return -1;
+        return -2;
     }
 
     // add to list
     if (DEBUG)
-            printf(" ** gpio_export: creating data struct **\n");
+        printf(" ** gpio_export: creating data struct **\n");
     new_gpio = malloc(sizeof(struct gpio_exp));  ASSRT(new_gpio != NULL);
 
     new_gpio->gpio = gpio;
@@ -423,8 +486,8 @@ int gpio_set_value(int gpio, unsigned int value)
         strncpy(vstr, "0", ARRAY_SIZE(vstr) - 1);
     }
 
-    if (DEBUG)
-        printf(" ** gpio_set_value: writing %s **\n", vstr);
+    //if (DEBUG)
+    //    printf(" ** gpio_set_value: writing %s **\n", vstr);
 
     ssize_t s = write(fd, vstr, strlen(vstr));  e_no = errno;
 
@@ -443,8 +506,7 @@ int gpio_get_value(int gpio, unsigned int *value)
     int fd = fd_lookup(gpio);
     char ch;
 
-    if (!fd)
-    {
+    if (!fd) {
         if ((fd = open_value_file(gpio)) == -1) {
             char err[256];
             snprintf(err, sizeof(err), "gpio_get_value: could not open GPIO %d value file", gpio);
@@ -482,6 +544,58 @@ int gpio_get_value(int gpio, unsigned int *value)
     }
 
     return 0;
+}
+
+int gpio_get_more(int gpio, int bits, unsigned int *value)
+{
+    int fd = fd_lookup(gpio);
+    char ch;
+    
+    if (!fd) {
+        if ((fd = open_value_file(gpio)) == -1) {
+            char err[256];
+            snprintf(err, sizeof(err), "gpio_get_more: could not open GPIO %d value file", gpio);
+            add_error_msg(err);
+            return -1;
+        }
+    }
+
+    // Loop for our number of bits
+    int i;
+    for (i = 0; i < bits; i++) {
+
+        if (lseek(fd, 0, SEEK_SET) < 0) {
+            char err[256];
+            snprintf(err, sizeof(err), "gpio_get_more: could not seek GPIO %d (%s)", gpio, strerror(errno));
+            add_error_msg(err);
+            return -1;
+        }
+        ssize_t s = read(fd, &ch, sizeof(ch));
+        if (s < 0) {
+            char err[256];
+            snprintf(err, sizeof(err), "gpio_get_more: could not read GPIO %d (%s)", gpio, strerror(errno));
+            add_error_msg(err);
+            return -1;
+        }
+    
+        if (ch == '1') {
+            *value |= (1 << i);
+        } else if (ch == '0') {
+            *value |= (0 << i);
+        } else {
+            char err[256];
+            snprintf(err, sizeof(err), "gpio_get_more: unrecognized read GPIO %d (%c)", gpio, ch);
+            add_error_msg(err);
+            return -1;
+        }
+        if (DEBUG) {
+            printf(" ** gpio_get_more: %c **\n", ch);
+            printf(" ** gpio_get_more: current value: %u **\n", *value);
+        }
+    }
+
+    return 0;
+    
 }
 
 int gpio_set_edge(int gpio, unsigned int edge)

@@ -43,6 +43,7 @@ SOFTWARE.
 #include "event_gpio.h"
 
 static int gpio_warnings = 1;
+static int r8_mem_setup = 0;
 
 int max_gpio = -1;
 dyn_int_array_t *gpio_direction = NULL;
@@ -58,13 +59,58 @@ struct py_callback
 };
 static struct py_callback *py_callbacks = NULL;
 
+// python function toggle_debug()
+static PyObject *py_toggle_debug(PyObject *self, PyObject *args)
+{
+    // toggle debug printing
+    toggle_debug();
+
+    Py_RETURN_NONE;
+}
+
 static int init_module(void)
 {
+    clear_error_msg();
+
+    // If we make it here, we're good to go
+    if (DEBUG)
+        printf(" ** init_module: setup complete **\n");
     module_setup = 1;
 
     return 0;
 }
 
+static int init_r8_gpio_mem(void)
+{
+    clear_error_msg();
+
+    if (DEBUG)
+        printf(" ** init_r8_gpio_mem: mapping memory **\n");
+    
+    if (map_pio_memory() < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "init_r8_gpio_mem error (%s)", get_error_msg());
+        PyErr_SetString(PyExc_RuntimeError, err);
+        return 0;
+    }
+
+    // If we make it here, we're good to go
+    if (DEBUG)
+        printf(" ** init_r8_gpio_mem: setup complete **\n");
+    r8_mem_setup = 1;
+    
+    return 0;
+}
+
+// python function value = is_chip_pro
+static PyObject *py_is_chip_pro(PyObject *self, PyObject *args)
+{
+    PyObject *py_value;
+    
+    py_value = Py_BuildValue("i", is_this_chippro());
+
+    return py_value;
+}
 
 static void remember_gpio_direction(int gpio, int direction)
 {
@@ -93,14 +139,11 @@ static PyObject *py_cleanup(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     // The !channel fixes issues #50
-    if (!channel || strcmp(channel, "") == 0) {
+    if (channel == NULL || strcmp(channel, "\0") == 0) {
         event_cleanup();
     } else {
         if (get_gpio_number(channel, &gpio) < 0) {
-            char err[2000];
-            snprintf(err, sizeof(err), "Invalid channel %s. (%s)", channel, get_error_msg());
-            PyErr_SetString(PyExc_ValueError, err);
-            return NULL;
+            event_cleanup();
         }
         gpio_unexport(gpio);
     }
@@ -111,68 +154,113 @@ static PyObject *py_cleanup(PyObject *self, PyObject *args, PyObject *kwargs)
 // python function setup(channel, direction, pull_up_down=PUD_OFF, initial=None)
 static PyObject *py_setup_channel(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-   int gpio;
-   char *channel;
-   int direction;
-   int pud = PUD_OFF;
-   int initial = 0;
-   static char *kwlist[] = {"channel", "direction", "pull_up_down", "initial", NULL};
+    int gpio;
+    int allowed = -1;
+    char *channel;
+    int direction;
+    int pud = PUD_OFF;
+    int initial = 0;
+    static char *kwlist[] = {"channel", "direction", "pull_up_down", "initial", NULL};
+ 
+    clear_error_msg();
+ 
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "si|ii", kwlist, &channel, &direction, &pud, &initial))
+        return NULL;
+ 
+    if (!module_setup) {
+        init_module();
+    }
+ 
+    if (direction != INPUT && direction != OUTPUT)
+    {
+        PyErr_SetString(PyExc_ValueError, "An invalid direction was passed to setup()");
+        return NULL;
+    }
+    
+    // Force pud to be off if we're configured for output
+    if (direction == OUTPUT) {
+        pud = PUD_OFF;
+    }
+ 
+    if (pud != PUD_OFF && pud != PUD_DOWN && pud != PUD_UP)
+    {
+        PyErr_SetString(PyExc_ValueError, "Invalid value for pull_up_down - should be either PUD_OFF, PUD_UP or PUD_DOWN");
+        return NULL;
+    }
+ 
+    if (get_gpio_number(channel, &gpio) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Invalid channel %s. (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+    
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
-   clear_error_msg();
-
-   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "si|ii", kwlist, &channel, &direction, &pud, &initial))
-      return NULL;
-
-   if (!module_setup) {
-      init_module();
-   }
-
-   if (direction != INPUT && direction != OUTPUT)
-   {
-      PyErr_SetString(PyExc_ValueError, "An invalid direction was passed to setup()");
-      return NULL;
-   }
-
-   if (direction == OUTPUT)
-      pud = PUD_OFF;
-
-   if (pud != PUD_OFF && pud != PUD_DOWN && pud != PUD_UP)
-   {
-      PyErr_SetString(PyExc_ValueError, "Invalid value for pull_up_down - should be either PUD_OFF, PUD_UP or PUD_DOWN");
-      return NULL;
-   }
-
-   if (get_gpio_number(channel, &gpio) < 0) {
-      char err[2000];
-      snprintf(err, sizeof(err), "Invalid channel %s. (%s)", channel, get_error_msg());
-      PyErr_SetString(PyExc_ValueError, err);
-      return NULL;
-   }
-
-   if (gpio_export(gpio) < 0) {
-      char err[2000];
-      snprintf(err, sizeof(err), "Error setting up channel %s, maybe already exported? (%s)", channel, get_error_msg());
-      PyErr_SetString(PyExc_RuntimeError, err);
-      return NULL;
-   }
-   if (gpio_set_direction(gpio, direction) < 0) {
-      char err[2000];
-      snprintf(err, sizeof(err), "Error setting direction %d on channel %s. (%s)", direction, channel, get_error_msg());
-      PyErr_SetString(PyExc_RuntimeError, err);
-      return NULL;
-   }
-   if (direction == OUTPUT) {
-       if (gpio_set_value(gpio, initial) < 0) {
+    // Only map /dev/mem if we're not an XIO
+    if (!r8_mem_setup && !(gpio >= lookup_gpio_by_name("XIO-P0") && gpio <= lookup_gpio_by_name("XIO-P7"))) {
+        init_r8_gpio_mem();
+    }
+ 
+    int exprtn = gpio_export(gpio);
+    if (exprtn == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error setting up channel %s, maybe already exported? (%s)", channel, get_error_msg());
+        PyErr_SetString(PyExc_RuntimeError, err);
+        return NULL;
+    } else if (exprtn == -2 && gpio_warnings) {
+        char warn[2000];
+        snprintf(warn, sizeof(warn), "Channel %s may already be exported, proceeding with rest of setup", channel);
+        PyErr_WarnEx(PyExc_Warning, warn, 1);
+    }
+    if (gpio_set_direction(gpio, direction) < 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error setting direction %d on channel %s. (%s)", direction, channel, get_error_msg());
+        PyErr_SetString(PyExc_RuntimeError, err);
+        return NULL;
+    }
+    
+    // Pull Up/Down
+    // Only if the pin we want is able to use it (R8 Owned, no XIO)
+    int port, pin;
+    if (compute_port_pin(channel, gpio, &port, &pin) == 0) {
+        // Set the PUD
+        gpio_set_pud(port, pin, pud);
+        // Check it was set properly
+        int pudr = gpio_get_pud(port, pin);
+        if (pudr != pud) {
+            char err[2000];
+            snprintf(err, sizeof(err), "Error setting pull up down %d on channel %s", pud, channel);
+            PyErr_SetString(PyExc_RuntimeError, err);
+            return NULL;
+        }
+    }
+    
+    if (direction == OUTPUT) {
+        if (gpio_set_value(gpio, initial) < 0) {
             char err[2000];
             snprintf(err, sizeof(err), "Error setting initial value %d on channel %s. (%s)", initial, channel, get_error_msg());
             PyErr_SetString(PyExc_RuntimeError, err);
             return NULL;
-       }
-   }
-
-   remember_gpio_direction(gpio, direction);
-
-   Py_RETURN_NONE;
+        }
+    }
+ 
+    remember_gpio_direction(gpio, direction);
+ 
+    Py_RETURN_NONE;
 }  /* py_setup_channel */
 
 
@@ -182,6 +270,7 @@ static PyObject *py_output_gpio(PyObject *self, PyObject *args)
     int gpio;
     int value;
     char *channel;
+    int allowed = -1;
 
     clear_error_msg();
 
@@ -190,6 +279,21 @@ static PyObject *py_output_gpio(PyObject *self, PyObject *args)
 
     if (get_gpio_number(channel, &gpio)) {
         PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -220,6 +324,7 @@ static PyObject *py_input_gpio(PyObject *self, PyObject *args)
     char *channel;
     unsigned int value;
     PyObject *py_value;
+    int allowed = -1;
 
     clear_error_msg();
 
@@ -228,6 +333,21 @@ static PyObject *py_input_gpio(PyObject *self, PyObject *args)
 
     if (get_gpio_number(channel, &gpio)) {
         PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -241,6 +361,115 @@ static PyObject *py_input_gpio(PyObject *self, PyObject *args)
     if (gpio_get_value(gpio, &value) < 0) {
       char err[1024];
       snprintf(err, sizeof(err), "Could not get value ('%s')", get_error_msg());
+      PyErr_SetString(PyExc_RuntimeError, err);
+      return NULL;
+    }
+
+    py_value = Py_BuildValue("i", value);
+
+    return py_value;
+}
+
+//TODO: Come up with a way to merge py_read_byte_gpio and py_read_word_gpio
+// python function value = read_byte(channel)
+static PyObject *py_read_byte_gpio(PyObject *self, PyObject *args)
+{
+    int gpio;
+    char *channel;
+    unsigned int value = 0;
+    PyObject *py_value;
+    int allowed = -1;
+
+    clear_error_msg();
+
+    if (!PyArg_ParseTuple(args, "s", &channel))
+        return NULL;
+
+    if (get_gpio_number(channel, &gpio)) {
+        PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
+   // check channel is set up as an input or output
+    if (!module_setup || (dyn_int_array_get(&gpio_direction, gpio, -1) == -1))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "You must setup() the GPIO channel first");
+        return NULL;
+    }
+
+    // We only want to get a 8 bits here
+    if (gpio_get_more(gpio, 8, &value) < 0) {
+      char err[1024];
+      snprintf(err, sizeof(err), "Could not get 8 bits of data ('%s')", get_error_msg());
+      PyErr_SetString(PyExc_RuntimeError, err);
+      return NULL;
+    }
+
+    py_value = Py_BuildValue("i", value);
+
+    return py_value;
+}
+
+// python function value = read_word(channel)
+static PyObject *py_read_word_gpio(PyObject *self, PyObject *args)
+{
+    int gpio;
+    char *channel;
+    unsigned int value = 0;
+    PyObject *py_value;
+    int allowed = -1;
+
+    clear_error_msg();
+
+    if (!PyArg_ParseTuple(args, "s", &channel))
+        return NULL;
+
+    if (get_gpio_number(channel, &gpio)) {
+        PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+    
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+    
+    // check channel is set up as an input or output
+    if (!module_setup || (dyn_int_array_get(&gpio_direction, gpio, -1) == -1))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "You must setup() the GPIO channel first");
+        return NULL;
+    }
+
+    // We only want to get a 8 bits here
+    if (gpio_get_more(gpio, 16, &value) < 0) {
+      char err[1024];
+      snprintf(err, sizeof(err), "Could not get 16 bits of data ('%s')", get_error_msg());
       PyErr_SetString(PyExc_RuntimeError, err);
       return NULL;
     }
@@ -328,6 +557,7 @@ static PyObject *py_add_event_callback(PyObject *self, PyObject *args, PyObject 
 {
    int gpio;
    char *channel;
+   int allowed = -1;
    unsigned int bouncetime = 0;
    PyObject *cb_func;
    char *kwlist[] = {"gpio", "callback", "bouncetime", NULL};
@@ -345,6 +575,21 @@ static PyObject *py_add_event_callback(PyObject *self, PyObject *args, PyObject 
 
     if (get_gpio_number(channel, &gpio)) {
         PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -382,6 +627,7 @@ static PyObject *py_add_event_detect(PyObject *self, PyObject *args, PyObject *k
    char *channel;
    int edge, result;
    unsigned int bouncetime = 0;
+   int allowed = -1;
    PyObject *cb_func = NULL;
    char *kwlist[] = {"gpio", "edge", "callback", "bouncetime", NULL};
 
@@ -400,6 +646,21 @@ static PyObject *py_add_event_detect(PyObject *self, PyObject *args, PyObject *k
        PyErr_SetString(PyExc_ValueError, "Invalid channel");
        return NULL;
    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
    // check to ensure gpio is one of the allowed pins
    if (gpio != lookup_gpio_by_name("AP-EINT3")
@@ -450,6 +711,7 @@ static PyObject *py_remove_event_detect(PyObject *self, PyObject *args)
    struct py_callback *cb = py_callbacks;
    struct py_callback *temp;
    struct py_callback *prev = NULL;
+   int allowed = -1;
 
    clear_error_msg();
 
@@ -460,6 +722,21 @@ static PyObject *py_remove_event_detect(PyObject *self, PyObject *args)
        PyErr_SetString(PyExc_ValueError, "Invalid channel");
        return NULL;
    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
    // check to ensure gpio is one of the allowed pins
    if (gpio != lookup_gpio_by_name("AP-EINT3")
@@ -498,6 +775,7 @@ static PyObject *py_event_detected(PyObject *self, PyObject *args)
 {
    int gpio;
    char *channel;
+   int allowed = -1;
 
    clear_error_msg();
 
@@ -508,6 +786,21 @@ static PyObject *py_event_detected(PyObject *self, PyObject *args)
        PyErr_SetString(PyExc_ValueError, "Invalid channel");
        return NULL;
    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
    if (event_detected(gpio))
       Py_RETURN_TRUE;
@@ -522,6 +815,7 @@ static PyObject *py_wait_for_edge(PyObject *self, PyObject *args)
    int edge, result;
    char *channel;
    char error[81];
+   int allowed = -1;
 
    clear_error_msg();
 
@@ -532,6 +826,21 @@ static PyObject *py_wait_for_edge(PyObject *self, PyObject *args)
        PyErr_SetString(PyExc_ValueError, "Invalid channel");
        return NULL;
    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
 
    // check to ensure gpio is one of the allowed pins
    if (gpio != lookup_gpio_by_name("AP-EINT3")
@@ -581,6 +890,7 @@ static PyObject *py_gpio_function(PyObject *self, PyObject *args)
     unsigned int value;
     PyObject *func;
     char *channel;
+    int allowed = -1;
 
     clear_error_msg();
 
@@ -589,6 +899,21 @@ static PyObject *py_gpio_function(PyObject *self, PyObject *args)
 
     if (get_gpio_number(channel, &gpio)) {
         PyErr_SetString(PyExc_ValueError, "Invalid channel");
+        return NULL;
+    }
+
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -742,10 +1067,6 @@ static PyObject *py_selftest(PyObject *self, PyObject *args)
   ASSRT(0 == build_path("/home", "ip", fp, sizeof(fp)));
   ASSRT(0 == build_path("/NOTFOUND", "ch", fp, sizeof(fp)));
 
-  printf("Testing get_spi_bus_path_number\n");
-  ASSRT(2 == get_spi_bus_path_number(0));  /* doesn't really work on CHIP */
-  ASSRT(2 == get_spi_bus_path_number(1));  /* doesn't really work on CHIP */
-
   printf("Testing error message buffer\n");
   clear_error_msg();
   ASSRT(0 == strlen(get_error_msg()));
@@ -783,6 +1104,7 @@ static PyObject *py_set_direction(PyObject *self, PyObject *args, PyObject *kwar
 	int gpio;
 	char *channel;
 	int direction;
+	int allowed = -1;
 	static char *kwlist[] = { "channel", "direction", NULL };
 
 	clear_error_msg();
@@ -807,6 +1129,21 @@ static PyObject *py_set_direction(PyObject *self, PyObject *args, PyObject *kwar
 		return NULL;
 	}
 
+    // Check to see if GPIO is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = gpio_allowed(gpio);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "GPIO %d not available on current Hardware", gpio);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
 	if (gpio_set_direction(gpio, direction) < 0) {
 		char err[2000];
 		snprintf(err, sizeof(err), "Error setting direction %d on channel %s. (%s)", direction, channel, get_error_msg());
@@ -824,6 +1161,8 @@ PyMethodDef gpio_methods[] = {
    {"cleanup", (PyCFunction)py_cleanup, METH_VARARGS | METH_KEYWORDS, "Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection"},
    {"output", py_output_gpio, METH_VARARGS, "Output to a GPIO channel\ngpio  - gpio channel\nvalue - 0/1 or False/True or LOW/HIGH"},
    {"input", py_input_gpio, METH_VARARGS, "Input from a GPIO channel.  Returns HIGH=1=True or LOW=0=False\ngpio - gpio channel"},
+   {"read_byte", py_read_byte_gpio, METH_VARARGS, "Read a byte (8 bits) from a set of GPIO channels. Returns 8-bits of integer data\ngpio - gpio channel."},
+   {"read_word", py_read_word_gpio, METH_VARARGS, "Read a word (16 bits) from a set of GPIO channels. Returns 16-bits of integer data\ngpio - gpio channel."},
    {"add_event_detect", (PyCFunction)py_add_event_detect, METH_VARARGS | METH_KEYWORDS, "Enable edge detection events for a particular GPIO channel.\nchannel      - either board pin number or BCM number depending on which mode is set.\nedge         - RISING, FALLING or BOTH\n[callback]   - A callback function for the event (optional)\n[bouncetime] - Switch bounce timeout in ms for callback"},
    {"remove_event_detect", py_remove_event_detect, METH_VARARGS, "Remove edge detection for a particular GPIO channel\ngpio - gpio channel"},
    {"event_detected", py_event_detected, METH_VARARGS, "Returns True if an edge has occured on a given GPIO.  You need to enable edge detection using add_event_detect() first.\ngpio - gpio channel"},
@@ -835,6 +1174,8 @@ PyMethodDef gpio_methods[] = {
    {"selftest", py_selftest, METH_VARARGS, "Internal unit tests"},
    {"direction", (PyCFunction)py_set_direction, METH_VARARGS | METH_KEYWORDS, "Change direction of gpio channel. Either INPUT or OUTPUT\n" },
    {"setmode", (PyCFunction)py_setmode, METH_VARARGS, "Dummy function that does nothing but maintain compatibility with RPi.GPIO\n" },
+   {"toggle_debug", py_toggle_debug, METH_VARARGS, "Toggles the enabling/disabling of Debug print output"},
+   {"is_chip_pro", py_is_chip_pro, METH_VARARGS, "Is hardware a CHIP Pro? Boolean False for normal CHIP/PocketCHIP (R8 SOC)"},
    {NULL, NULL, 0, NULL}
 };
 

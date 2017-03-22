@@ -1,0 +1,51 @@
+chip-io (0.5.6-1) unstable; urgency=low
+
+  * Fix for Issue #63 where re-setting up a pin wasn't lining up with RPi.GPIO standards. Calling setup after the first time will now update direction.
+  * README updates to point out the direction() function since that was missing
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Mon, 20 Mar 2017 23:04:00 -0600
+
+chip-io (0.5.5-1) unstable; urgency=low
+
+  * Fix for Issue #62 where using alternate name of an XIO would cause a segfault due to trying to set pull up/down resistor setting
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Mon, 6 Mar 2017 17:02:00 -0600
+
+chip-io (0.5.4-1) unstable; urgency=low
+
+  * Re-enabled the polarity setting for PWM based upon Issue #61
+  * Fixed a 1 letter bug was trying to write inverted to polarity when it wants inversed (such facepalm)
+  * Cleaned up the polarity setting code to work when PWM is not enabled
+  * Fixed the unit test for pwm to verify we can set polarity
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Sat, 4 Mar 2017 20:46:00 -0600
+
+chip-io (0.5.3-1) unstable; urgency=low
+
+  * Fixes to the PWM pytest
+  * Added pytest for LRADC and Utilities
+  * Makefile updates for all the things
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Sun, 26 Feb 2017 20:46:00 -0600
+
+chip-io (0.5.2-1) unstable; urgency=low
+
+  * Updating Utilities to determine CHIP Pro better
+  * Updating Utilities to only run CHIP appropriate code on the CHIP and not CHIP Pro
+  * Updated README
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Sun, 26 Feb 2017 13:56:00 -0600
+
+chip-io (0.5.0-1) unstable; urgency=low
+
+  * CHIP Pro support for PWM1, reduced GPIO capability
+  * New is_chip_pro() in each of the PWM, GPIO, SoftPWM, and Servo modules
+  * Updated README
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Sat, 25 Feb 2017 19:00:00 -0600
+
+chip-io (0.4.0-1) unstable; urgency=low
+
+  * source package automatically created by stdeb 0.8.2
+
+ -- Robert Wolterman <robert.wolterman@gmail.com>  Sat, 18 Feb 2017 23:58:48 +0000

@@ -1,4 +1,8 @@
 /*
+Copyright (c) 2017 Robert Wolterman
+
+Using CHIP_IO servo code from Brady Hurlburt as a basis for the servo code
+
 Copyright (c) 2016 Brady Hurlburt
 
 Original BBIO Author Justin Cooper
@@ -32,7 +36,7 @@ SOFTWARE.
 #include "Python.h"
 #include "constants.h"
 #include "common.h"
-#include "c_softpwm.h"
+#include "c_softservo.h"
 
 // python function toggle_debug()
 static PyObject *py_toggle_debug(PyObject *self, PyObject *args)
@@ -46,8 +50,8 @@ static PyObject *py_toggle_debug(PyObject *self, PyObject *args)
 // python function cleanup()
 static PyObject *py_cleanup(PyObject *self, PyObject *args)
 {
-    // unexport the PWM
-    softpwm_cleanup();
+    // unexport the Servo
+    servo_cleanup();
 
     Py_RETURN_NONE;
 }
@@ -55,7 +59,7 @@ static PyObject *py_cleanup(PyObject *self, PyObject *args)
 static int init_module(void)
 {
     clear_error_msg();
-
+    
     // If we make it here, we're good to go
     if (DEBUG)
         printf(" ** init_module: setup complete **\n");
@@ -74,21 +78,20 @@ static PyObject *py_is_chip_pro(PyObject *self, PyObject *args)
     return py_value;
 }
 
-// python function start(channel, duty_cycle, freq)
+// python function start(channel, angle, range)
 static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+    int gpio;
     char key[8];
     char *channel = NULL;
-    float frequency = 2000.0;
-    float duty_cycle = 0.0;
-    int polarity = 0;
-    int gpio;
+    float angle = 0.0;
+    float range = 180.0;
     int allowed = -1;
-    static char *kwlist[] = {"channel", "duty_cycle", "frequency", "polarity", NULL};
+    static char *kwlist[] = {"channel", "angle", "range", NULL};
 
     clear_error_msg();
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ffi", kwlist, &channel, &duty_cycle, &frequency, &polarity)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|ff", kwlist, &channel, &angle, &range)) {
         return NULL;
     }
     ASSRT(channel != NULL);
@@ -98,13 +101,17 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
     }
 
     if (!get_key(channel, key)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid SOFTPWM key or name.");
+        PyErr_SetString(PyExc_ValueError, "Invalid Servo key or name.");
         return NULL;
     }
 
     // check to ensure gpio is one of the allowed pins
     // Not protecting the call as if the get_key() fails, we won't make it here
     get_gpio_number(channel, &gpio);
+    if ((gpio >= lookup_gpio_by_name("XIO-P0") && gpio <= lookup_gpio_by_name("XIO-P7"))) {
+        PyErr_SetString(PyExc_ValueError, "Servo currently not available on XIO-P0 to XIO-P7");
+        return NULL;
+    }
 
     // Check to see if GPIO is allowed on the hardware
     // A 1 means we're good to go
@@ -121,25 +128,10 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
-        PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
-        return NULL;
-    }
-
-    if (frequency <= 0.0) {
-        PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0");
-        return NULL;
-    }
-
-    if (polarity < 0 || polarity > 1) {
-        PyErr_SetString(PyExc_ValueError, "polarity must be either 0 or 1");
-        return NULL;
-    }
-
-    if (softpwm_start(key, duty_cycle, frequency, polarity) < 0) {
-       printf("softpwm_start failed");
+    if (servo_start(key, angle, range) < 0) {
+       printf("servo_start failed");
        char err[2000];
-       snprintf(err, sizeof(err), "Error starting softpwm on pin %s (%s)", key, get_error_msg());
+       snprintf(err, sizeof(err), "Error starting servo on pin %s (%s)", key, get_error_msg());
        PyErr_SetString(PyExc_RuntimeError, err);
        return NULL;
     }
@@ -150,10 +142,10 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
 // python function stop(channel)
 static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    char key[8];
-    char *channel;
     int gpio;
+    char key[8];
     int allowed = -1;
+    char *channel;
 
     clear_error_msg();
 
@@ -161,13 +153,17 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
         return NULL;
 
     if (!get_key(channel, key)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        PyErr_SetString(PyExc_ValueError, "Invalid key or name");
         return NULL;
     }
 
     // check to ensure gpio is one of the allowed pins
     // Not protecting the call as if the get_key() fails, we won't make it here
     get_gpio_number(channel, &gpio);
+    if ((gpio >= lookup_gpio_by_name("XIO-P0") && gpio <= lookup_gpio_by_name("XIO-P7"))) {
+        PyErr_SetString(PyExc_ValueError, "Servo currently not available on XIO-P0 to XIO-P7");
+        return NULL;
+    }
 
     // Check to see if GPIO is allowed on the hardware
     // A 1 means we're good to go
@@ -184,39 +180,43 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
         return NULL;
     }
 
-    softpwm_disable(key);
+    servo_disable(key);
 
     Py_RETURN_NONE;
 }
 
-// python method PWM.set_duty_cycle(channel, duty_cycle)
-static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwargs)
+// python method SERVO.set_range(channel, duty_cycle)
+static PyObject *py_set_range(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+    int gpio;
     char key[8];
     char *channel;
-    int gpio;
+    float range = 180.0;
     int allowed = -1;
-    float duty_cycle = 0.0;
-    static char *kwlist[] = {"channel", "duty_cycle", NULL};
+    static char *kwlist[] = {"channel", "range", NULL};
 
     clear_error_msg();
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &duty_cycle))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &range))
         return NULL;
 
-    if (duty_cycle < 0.0 || duty_cycle > 100.0) {
-        PyErr_SetString(PyExc_ValueError, "duty_cycle must have a value from 0.0 to 100.0");
+    if (range > 360.0) {
+        PyErr_SetString(PyExc_ValueError, "range can not be greater than 360.0");
         return NULL;
     }
 
     if (!get_key(channel, key)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        PyErr_SetString(PyExc_ValueError, "Invalid key or name.");
         return NULL;
     }
 
     // check to ensure gpio is one of the allowed pins
     // Not protecting the call as if the get_key() fails, we won't make it here
     get_gpio_number(channel, &gpio);
+    if ((gpio >= lookup_gpio_by_name("XIO-P0") && gpio <= lookup_gpio_by_name("XIO-P7"))) {
+        PyErr_SetString(PyExc_ValueError, "Servo currently not available on XIO-P0 to XIO-P7");
+        return NULL;
+    }
 
     // Check to see if GPIO is allowed on the hardware
     // A 1 means we're good to go
@@ -233,42 +233,46 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
         return NULL;
     }
 
-    if (softpwm_set_duty_cycle(key, duty_cycle) == -1) {
-        PyErr_SetString(PyExc_RuntimeError, "You must start() the PWM channel first");
+    if (servo_set_range(key, range) == -1) {
+        PyErr_SetString(PyExc_RuntimeError, "You must start() the Servo channel first");
         return NULL;
     }
 
     Py_RETURN_NONE;
 }
 
-// python method PWM.set_frequency(channel, frequency)
-static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwargs)
+// python method SERVO.set_angle(channel, duty_cycle)
+static PyObject *py_set_angle(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+    int gpio;
     char key[8];
     char *channel;
-    int gpio;
+    float angle = 0.0;
     int allowed = -1;
-    float frequency = 1.0;
-    static char *kwlist[] = {"channel", "frequency", NULL};
+    static char *kwlist[] = {"channel", "angle", NULL};
 
     clear_error_msg();
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &frequency))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist, &channel, &angle))
         return NULL;
 
-    if ((frequency <= 0.0) || (frequency > 10000.0)) {
-        PyErr_SetString(PyExc_ValueError, "frequency must be greater than 0.0 and less than 10000.0");
-        return NULL;
-    }
+    //if (range > 360.0) {
+    //    PyErr_SetString(PyExc_ValueError, "range can not be greater than 360.0");
+    //    return NULL;
+    //}
 
     if (!get_key(channel, key)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        PyErr_SetString(PyExc_ValueError, "Invalid key or name.");
         return NULL;
     }
 
     // check to ensure gpio is one of the allowed pins
     // Not protecting the call as if the get_key() fails, we won't make it here
     get_gpio_number(channel, &gpio);
+    if ((gpio >= lookup_gpio_by_name("XIO-P0") && gpio <= lookup_gpio_by_name("XIO-P7"))) {
+        PyErr_SetString(PyExc_ValueError, "Servo currently not available on XIO-P0 to XIO-P7");
+        return NULL;
+    }
 
     // Check to see if GPIO is allowed on the hardware
     // A 1 means we're good to go
@@ -285,50 +289,52 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    if (softpwm_set_frequency(key, frequency) == -1) {
-        PyErr_SetString(PyExc_RuntimeError, "You must start() the PWM channel first");
-        return NULL;
+    if (servo_set_angle(key, angle) == -1) {
+       char err[2000];
+       snprintf(err, sizeof(err), "Error setting servo angle on pin %s (%s)", key, get_error_msg());
+       PyErr_SetString(PyExc_RuntimeError, err);
+       return NULL;
     }
 
     Py_RETURN_NONE;
 }
 
-static const char moduledocstring[] = "Software PWM functionality of a CHIP using Python";
+static const char moduledocstring[] = "Software Servo functionality of a CHIP using Python";
 
-PyMethodDef pwm_methods[] = {
-    {"start", (PyCFunction)py_start_channel, METH_VARARGS | METH_KEYWORDS, "Set up and start the PWM channel.  channel can be in the form of 'XIO-P0', or 'U14_13'"},
-    {"stop", (PyCFunction)py_stop_channel, METH_VARARGS | METH_KEYWORDS, "Stop the PWM channel.  channel can be in the form of 'XIO-P0', or 'U14_13'"},
-    {"set_duty_cycle", (PyCFunction)py_set_duty_cycle, METH_VARARGS, "Change the duty cycle\ndutycycle - between 0.0 and 100.0" },
-    {"set_frequency", (PyCFunction)py_set_frequency, METH_VARARGS, "Change the frequency\nfrequency - frequency in Hz (freq > 0.0)" },
-    {"cleanup", (PyCFunction)py_cleanup, METH_VARARGS, "Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection"},
+PyMethodDef servo_methods[] = {
+    {"start", (PyCFunction)py_start_channel, METH_VARARGS | METH_KEYWORDS, "Set up and start the Servo.  channel can be in the form of 'XIO-P0', or 'U14_13'"},
+    {"stop", (PyCFunction)py_stop_channel, METH_VARARGS | METH_KEYWORDS, "Stop the Servo.  channel can be in the form of 'XIO-P0', or 'U14_13'"},
+    {"set_range", (PyCFunction)py_set_range, METH_VARARGS, "Change the servo range\nrange - max angular range of the servo" },
+    {"set_angle", (PyCFunction)py_set_angle, METH_VARARGS, "Change the servo angle\nangle - angle of the servo between +/-(range/2)" },
+    {"cleanup", (PyCFunction)py_cleanup, METH_VARARGS, "Clean up by resetting All or one Servo that have been used by this program."},
     {"toggle_debug", py_toggle_debug, METH_VARARGS, "Toggles the enabling/disabling of Debug print output"},
     {"is_chip_pro", py_is_chip_pro, METH_VARARGS, "Is hardware a CHIP Pro? Boolean False for normal CHIP/PocketCHIP (R8 SOC)"},
     {NULL, NULL, 0, NULL}
 };
 
 #if PY_MAJOR_VERSION > 2
-static struct PyModuleDef chipspwmmodule = {
+static struct PyModuleDef chipservomodule = {
     PyModuleDef_HEAD_INIT,
-    "SOFTPWM",       // name of module
+    "SERVO",       // name of module
     moduledocstring,  // module documentation, may be NULL
     -1,               // size of per-interpreter state of the module, or -1 if the module keeps state in global variables.
-    pwm_methods
+    servo_methods
 };
 #endif
 
 #if PY_MAJOR_VERSION > 2
-PyMODINIT_FUNC PyInit_SOFTPWM(void)
+PyMODINIT_FUNC PyInit_SERVO(void)
 #else
-PyMODINIT_FUNC initSOFTPWM(void)
+PyMODINIT_FUNC initSERVO(void)
 #endif
 {
     PyObject *module = NULL;
 
 #if PY_MAJOR_VERSION > 2
-    if ((module = PyModule_Create(&chipspwmmodule)) == NULL)
+    if ((module = PyModule_Create(&chipservomodule)) == NULL)
        return NULL;
 #else
-    if ((module = Py_InitModule3("SOFTPWM", pwm_methods, moduledocstring)) == NULL)
+    if ((module = Py_InitModule3("SERVO", servo_methods, moduledocstring)) == NULL)
        return;
 #endif
 

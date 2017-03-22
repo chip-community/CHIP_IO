@@ -45,6 +45,7 @@ SOFTWARE.
 #include <string.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <sys/sysinfo.h>
 
 int setup_error = 0;
 int module_setup = 0;
@@ -52,90 +53,93 @@ int module_setup = 0;
 // Library Debug
 int DEBUG = 0;
 
+// Is This a CHIP PRO
+int is_chip_pro = 0;
+
 pins_t pins_info[] = {
-  { "GND",       "GND",         "U13_1",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CHG-IN",    "CHG-IN",      "U13_2",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "VCC-5V",    "VCC-5V",      "U13_3",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U13_4",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "VCC-3V3",   "VCC-3V3",     "U13_5",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "TS",        "TS",          "U13_6",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "VCC-1V8",   "VCC-1V8",     "U13_7",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "BAT",       "BAT",         "U13_8",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "TWI1-SDA",  "KPD-I2C-SDA", "U13_9",   48, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "PWRON",     "PWRON",       "U13_10",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "TWI1-SCK",  "KPD-I2C-SCL", "U13_11",  47, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U13_12",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "X1",        "X1",          "U13_13",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "X2",        "X2",          "U13_14",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "Y1",        "Y1",          "U13_15",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "Y2",        "Y2",          "U13_16",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D2",    "LCD-D2",      "U13_17",  98, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "PWM0",      "PWM0",        "U13_18",  34, BASE_METHOD_AS_IS,  0, -1, SPWM_DISABLED},
-  { "LCD-D4",    "LCD-D4",      "U13_19", 100, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D3",    "LCD-D3",      "U13_20",  99, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D6",    "LCD-D6",      "U13_21", 102, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D5",    "LCD-D5",      "U13_22", 101, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D10",   "LCD-D10",     "U13_23", 106, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D7",    "LCD-D7",      "U13_24", 103, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D12",   "LCD-D12",     "U13_25", 108, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D11",   "LCD-D11",     "U13_26", 107, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D14",   "LCD-D14",     "U13_27", 110, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D13",   "LCD-D13",     "U13_28", 109, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D18",   "LCD-D18",     "U13_29", 114, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D15",   "LCD-D15",     "U13_30", 111, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D20",   "LCD-D20",     "U13_31", 116, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D19",   "LCD-D19",     "U13_32", 115, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D22",   "LCD-D22",     "U13_33", 118, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D21",   "LCD-D21",     "U13_34", 117, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-CLK",   "LCD-CLK",     "U13_35", 120, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-D23",   "LCD-D23",     "U13_36", 119, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-VSYNC", "LCD-VSYNC",   "U13_37", 123, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-HSYNC", "LCD-HSYNC",   "U13_38", 122, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U13_39",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LCD-DE",    "LCD-DE",      "U13_40", 121, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U14_1",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "VCC-5V",    "VCC-5V",      "U14_2",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "UART1-TX",  "UART-TX",     "U14_3",  195, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "HPL",       "HPL",         "U14_4",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "UART1-RX",  "UART-RX",     "U14_5",  196, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "HPCOM",     "HPCOM",       "U14_6",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "FEL",       "FEL",         "U14_7",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "HPR",       "HPR",         "U14_8",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "VCC-3V3",   "VCC-3V3",     "U14_9",   -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "MICM",      "MICM",        "U14_10",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "LRADC",     "ADC",         "U14_11",  -1, BASE_METHOD_AS_IS, -1,  0, SPWM_DISABLED},
-  { "MICIN1",    "MICIN1",      "U14_12",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "XIO-P0",    "XIO-P0",      "U14_13",   0, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P1",    "XIO-P1",      "U14_14",   1, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P2",    "GPIO1",       "U14_15",   2, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P3",    "GPIO2",       "U14_16",   3, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P4",    "GPIO3",       "U14_17",   4, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P5",    "GPIO4",       "U14_18",   5, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P6",    "GPIO5",       "U14_19",   6, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "XIO-P7",    "GPIO6",       "U14_20",   7, BASE_METHOD_XIO,   -1, -1, SPWM_ENABLED},
-  { "GND",       "GND",         "U14_21",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U14_22",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "AP-EINT1",  "KPD-INT",     "U14_23", 193, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "AP-EINT3",  "AP-INT3",     "U14_24",  35, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "TWI2-SDA",  "I2C-SDA",     "U14_25",  50, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "TWI2-SCK",  "I2C-SCL",     "U14_26",  49, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSIPCK",    "SPI-SEL",     "U14_27", 128, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSICK",     "SPI-CLK",     "U14_28", 129, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSIHSYNC",  "SPI-MOSI",    "U14_29", 130, BASE_METHOD_AS_IS,  1, -1, SPWM_DISABLED},
-  { "CSIVSYNC",  "SPI-MISO",    "U14_30", 131, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID0",     "CSID0",       "U14_31", 132, BASE_METHOD_AS_IS,  1, -1, SPWM_DISABLED},
-  { "CSID1",     "CSID1",       "U14_32", 133, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID2",     "CSID2",       "U14_33", 134, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID3",     "CSID3",       "U14_34", 135, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID4",     "CSID4",       "U14_35", 136, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID5",     "CSID5",       "U14_36", 137, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID6",     "CSID6",       "U14_37", 138, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "CSID7",     "CSID7",       "U14_38", 139, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U14_39",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
-  { "GND",       "GND",         "U14_40",  -1, BASE_METHOD_AS_IS, -1, -1, SPWM_DISABLED},
+  { "GND",       "GND",         "U13_1",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CHG-IN",    "CHG-IN",      "U13_2",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "VCC-5V",    "VCC-5V",      "U13_3",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "GND",       "GND",         "U13_4",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "VCC-3V3",   "VCC-3V3",     "U13_5",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "TS",        "TS",          "U13_6",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "VCC-1V8",   "VCC-1V8",     "U13_7",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "BAT",       "BAT",         "U13_8",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "TWI1-SDA",  "KPD-I2C-SDA", "U13_9",   48, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "PWRON",     "PWRON",       "U13_10",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "TWI1-SCK",  "KPD-I2C-SCL", "U13_11",  47, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "GND",       "GND",         "U13_12",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "X1",        "X1",          "U13_13",  -1, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "X2",        "X2",          "U13_14",  -1, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "Y1",        "Y1",          "U13_15",  -1, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "Y2",        "Y2",          "U13_16",  -1, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D2",    "UART2-TX",    "U13_17",  98, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "PWM0",      "PWM0",        "U13_18",  34, BASE_METHOD_AS_IS,  0, -1, BOTH},
+  { "PWM1",      "PWM1",        "EINT13", 205, BASE_METHOD_AS_IS,  0, -1, CHIPPRO},
+  { "LCD-D4",    "UART2-CTS",   "U13_19", 100, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "LCD-D3",    "UART2-RX",    "U13_20",  99, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "LCD-D6",    "LCD-D6",      "U13_21", 102, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D5",    "UART2-RTS",   "U13_22", 101, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "LCD-D10",   "LCD-D10",     "U13_23", 106, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D7",    "LCD-D7",      "U13_24", 103, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D12",   "LCD-D12",     "U13_25", 108, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D11",   "LCD-D11",     "U13_26", 107, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D14",   "LCD-D14",     "U13_27", 110, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D13",   "LCD-D13",     "U13_28", 109, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D18",   "LCD-D18",     "U13_29", 114, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D15",   "LCD-D15",     "U13_30", 111, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D20",   "LCD-D20",     "U13_31", 116, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D19",   "LCD-D19",     "U13_32", 115, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D22",   "LCD-D22",     "U13_33", 118, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D21",   "LCD-D21",     "U13_34", 117, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-CLK",   "LCD-CLK",     "U13_35", 120, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-D23",   "LCD-D23",     "U13_36", 119, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-VSYNC", "LCD-VSYNC",   "U13_37", 123, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "LCD-HSYNC", "LCD-HSYNC",   "U13_38", 122, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "GND",       "GND",         "U13_39",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "LCD-DE",    "LCD-DE",      "U13_40", 121, BASE_METHOD_AS_IS, -1, -1, CHIP},
+  { "GND",       "GND",         "U14_1",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "VCC-5V",    "VCC-5V",      "U14_2",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "UART1-TX",  "UART-TX",     "U14_3",  195, BASE_METHOD_AS_IS, -1, -1, BOTH}, /* THIS IS AP-EINT3 ON CHIP PRO */
+  { "HPL",       "HPL",         "U14_4",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "UART1-RX",  "UART-RX",     "U14_5",  196, BASE_METHOD_AS_IS, -1, -1, BOTH}, /* THIS IS AP-EINT4 ON CHIP PRO */
+  { "HPCOM",     "HPCOM",       "U14_6",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "FEL",       "FEL",         "U14_7",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "HPR",       "HPR",         "U14_8",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "VCC-3V3",   "VCC-3V3",     "U14_9",   -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "MICM",      "MICM",        "U14_10",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "LRADC",     "ADC",         "U14_11",  -1, BASE_METHOD_AS_IS, -1,  0, BOTH},
+  { "MICIN1",    "MICIN1",      "U14_12",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "XIO-P0",    "XIO-P0",      "U14_13",   0, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P1",    "XIO-P1",      "U14_14",   1, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P2",    "GPIO1",       "U14_15",   2, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P3",    "GPIO2",       "U14_16",   3, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P4",    "GPIO3",       "U14_17",   4, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P5",    "GPIO4",       "U14_18",   5, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P6",    "GPIO5",       "U14_19",   6, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "XIO-P7",    "GPIO6",       "U14_20",   7, BASE_METHOD_XIO,   -1, -1, CHIP},
+  { "GND",       "GND",         "U14_21",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "GND",       "GND",         "U14_22",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "AP-EINT1",  "KPD-INT",     "U14_23", 193, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "AP-EINT3",  "AP-INT3",     "U14_24",  35, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "TWI2-SDA",  "I2C-SDA",     "U14_25",  50, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "TWI2-SCK",  "I2C-SCL",     "U14_26",  49, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSIPCK",    "SPI-SEL",     "U14_27", 128, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSICK",     "SPI-CLK",     "U14_28", 129, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSIHSYNC",  "SPI-MOSI",    "U14_29", 130, BASE_METHOD_AS_IS,  1, -1, BOTH},
+  { "CSIVSYNC",  "SPI-MISO",    "U14_30", 131, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID0",     "D0",          "U14_31", 132, BASE_METHOD_AS_IS,  1, -1, BOTH},
+  { "CSID1",     "D1",          "U14_32", 133, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID2",     "D2",          "U14_33", 134, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID3",     "D3",          "U14_34", 135, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID4",     "D4",          "U14_35", 136, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID5",     "D5",          "U14_36", 137, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID6",     "D6",          "U14_37", 138, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "CSID7",     "D7",          "U14_38", 139, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "GND",       "GND",         "U14_39",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
+  { "GND",       "GND",         "U14_40",  -1, BASE_METHOD_AS_IS, -1, -1, BOTH},
   { NULL,        NULL,          NULL,      -1, 0,                 -1, -1, -1}
 };
-
 
 // CREDIT FOR THIS FUNCTION DUE TO HOWIE KATZ OF NTC AND STEVE FORD
 // THIS WILL FIND THE PROPER XIO BASE SYSFS NUMBER
@@ -217,12 +221,107 @@ int get_xio_base(void)
   return xio_base_address; 
 }  /* get_xio_base */
 
+#define RAMDETERMINER 380.0
+
+int is_this_chippro(void)
+{
+    int is_pro = 0;
+    struct sysinfo si;
+    sysinfo (&si);
+    const double megabyte = 1024 * 1024;
+    
+    if (DEBUG)
+        printf(" ** is_this_chippro: total system ram: %5.1f mb\n", si.totalram / megabyte);
+    
+    if ((si.totalram/megabyte) > RAMDETERMINER) {
+        is_pro = 0;
+        if (DEBUG)
+            printf(" ** is_this_chippro: we are a chip\n");
+    } else {
+        is_pro = 1;
+        if (DEBUG)
+            printf(" ** is_this_chippro: we are a chip pro\n");
+    }
+    
+    return is_pro;
+}
+
+int gpio_allowed(int gpio)
+{
+    int rtnval = -1;
+    pins_t *p;
+    int tmpgpio = -1;
+    
+    // If the return is good, we should be good to go, so let's check the data
+
+    // Loop through the pins
+    for (p = pins_info; p->key != NULL; ++p) {
+        tmpgpio = gpio_number(p);
+        if (tmpgpio == gpio) {
+            if (DEBUG)
+                printf(" ** gpio_allowed: found match\n");
+            // We have a CHIP and the pin is for CHIP/BOTH
+            if (((p->sbc_type == CHIP) || (p->sbc_type == BOTH)) && (is_this_chippro() == 0)) {
+                if (DEBUG)
+                    printf(" ** gpio_allowed: pin allowed for chip or both and we're a chip\n");
+                rtnval = 1;
+            // We have a CHIP Pro and the pin is for CHIPPRO/BOTH
+            } else if (((p->sbc_type == CHIPPRO) || (p->sbc_type == BOTH)) && (is_this_chippro() == 1)) {
+                if (DEBUG)
+                    printf(" ** gpio_allowed: pin allowed for chip pro or both and we're a chip pro\n");
+                rtnval = 1;
+            } else {
+                if (DEBUG)
+                    printf(" ** gpio_allowed: pin is not allowed on hardware\n");
+                rtnval = 0;
+            }
+        }
+    }
+
+    return rtnval;
+}
+
+int pwm_allowed(const char *key)
+{
+    int rtnval = -1;
+    pins_t *p;
+    // Determine if we are CHIP Pro
+    // Running because we cannot be sure if it was previously run
+    
+    // If the return is good, we should be good to go, so let's check the data
+    for (p = pins_info; p->key != NULL; ++p) {
+        if (strcmp(p->key, key) == 0) {
+            if (DEBUG)
+                printf(" ** pwm_allowed: found match\n");
+            // We have a CHIP and the pin is for CHIP/BOTH
+            if ((p->sbc_type == BOTH) && (is_this_chippro() == 0)) {
+                if (DEBUG)
+                    printf(" ** pwm_allowed: pwm allowed for chip or both and we're a chip\n");
+                rtnval = 1;
+            // We have a CHIP Pro and the pin is for CHIPPRO/BOTH
+            } else if (((p->sbc_type == CHIPPRO) || (p->sbc_type == BOTH)) && (is_this_chippro() == 1)) {
+                if (DEBUG)
+                    printf(" ** pwm_allowed: pwm allowed for chip pro or both and we're a chip pro\n");
+                rtnval = 1;
+            } else {
+                if (DEBUG)
+                    printf(" ** pwm_allowed: pwm is not allowed on hardware\n");
+                rtnval = 0;
+            }
+        }
+    }
+
+    return rtnval;
+}
+
 void toggle_debug(void)
 {
     if (DEBUG) {
         DEBUG = 0;
+        printf(" ** debug disabled\n");
     } else {
         DEBUG = 1;
+        printf(" ** debug enabled\n");
     }
 }
 
@@ -250,6 +349,22 @@ int gpio_number(pins_t *pin)
   return gpio_num;
 }  /* gpio_number */
 
+int gpio_pud_capable(pins_t *pin)
+{
+  int capable = -1;
+
+  switch (pin->base_method) {
+    case BASE_METHOD_AS_IS:
+      capable = 1;
+      break;
+    
+    case BASE_METHOD_XIO:
+      capable = 0;
+      break;
+  }
+
+  return capable;
+}
 
 int lookup_gpio_by_key(const char *key)
 {
@@ -279,6 +394,39 @@ int lookup_gpio_by_altname(const char *altname)
   for (p = pins_info; p->altname != NULL; ++p) {
       if (strcmp(p->altname, altname) == 0) {
           return gpio_number(p);
+      }
+  }
+  return -1;
+}
+
+int lookup_pud_capable_by_key(const char *key)
+{
+  pins_t *p;
+  for (p = pins_info; p->key != NULL; ++p) {
+      if (strcmp(p->key, key) == 0) {
+          return gpio_pud_capable(p);
+      }
+  }
+  return -1;
+}
+
+int lookup_pud_capable_by_name(const char *name)
+{
+  pins_t *p;
+  for (p = pins_info; p->name != NULL; ++p) {
+      if (strcmp(p->name, name) == 0) {
+          return gpio_pud_capable(p);
+      }
+  }
+  return -1;
+}
+
+int lookup_pud_capable_by_altname(const char *altname)
+{
+  pins_t *p;
+  for (p = pins_info; p->altname != NULL; ++p) {
+      if (strcmp(p->altname, altname) == 0) {
+          return gpio_pud_capable(p);
       }
   }
   return -1;
@@ -395,6 +543,33 @@ int get_gpio_number(const char *key, int *gpio)
         }
     }
     return status;
+}
+
+int compute_port_pin(const char *key, int gpio, int *port, int *pin)
+{
+    int capable = 0;
+    int rtn = -1;
+
+    capable = lookup_pud_capable_by_key(key);
+    if (capable < 0) {
+        capable = lookup_pud_capable_by_name(key);
+        if (capable < 0) {
+             capable = lookup_pud_capable_by_altname(key);
+             if (capable < 0) {
+                 capable = 0;  // default to false
+             }
+        }
+    }
+
+    if (capable) {
+        // Method from:
+        // https://bbs.nextthing.co/t/chippy-gonzales-fast-gpio/14056/6?u=xtacocorex
+        *port = gpio / 32;
+        *pin = gpio % 32;
+        rtn = 0;
+    }
+    
+    return rtn;
 }
 
 int get_key(const char *input, char *key)

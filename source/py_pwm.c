@@ -52,6 +52,28 @@ static PyObject *py_toggle_debug(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static int init_module(void)
+{
+    clear_error_msg();
+
+    // If we make it here, we're good to go
+    if (DEBUG)
+        printf(" ** init_module: setup complete **\n");
+    module_setup = 1;
+
+    return 0;
+}
+
+// python function value = is_chip_pro
+static PyObject *py_is_chip_pro(PyObject *self, PyObject *args)
+{
+    PyObject *py_value;
+    
+    py_value = Py_BuildValue("i", is_this_chippro());
+
+    return py_value;
+}
+
 // python function start(channel, duty_cycle, freq)
 static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -60,6 +82,7 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
     float frequency = 2000.0;
     float duty_cycle = 0.0;
     int polarity = 0;
+    int allowed = -1;
     static char *kwlist[] = {"channel", "duty_cycle", "frequency", "polarity", NULL};
 
     clear_error_msg();
@@ -68,8 +91,27 @@ static PyObject *py_start_channel(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
+    if (!module_setup) {
+        init_module();
+    }
+
     if (!get_pwm_key(channel, key)) {
         PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -103,6 +145,7 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
 {
     char key[8];
     char *channel;
+    int allowed = -1;
 
     clear_error_msg();
 
@@ -111,6 +154,21 @@ static PyObject *py_stop_channel(PyObject *self, PyObject *args, PyObject *kwarg
 
     if (!get_pwm_key(channel, key)) {
         PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -129,6 +187,7 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
 {
     char key[8];
     char *channel;
+    int allowed = -1;
     float duty_cycle = 0.0;
     static char *kwlist[] = {"channel", "duty_cycle", NULL};
 
@@ -147,6 +206,21 @@ static PyObject *py_set_duty_cycle(PyObject *self, PyObject *args, PyObject *kwa
         return NULL;
     }
 
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
     if (pwm_set_duty_cycle(key, duty_cycle) == -1) {
         char err[2000];
         snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
@@ -162,6 +236,7 @@ static PyObject *py_set_pulse_width_ns(PyObject *self, PyObject *args, PyObject 
 {
     char key[8];
     char *channel;
+    int allowed = -1;
     unsigned long pulse_width_ns = 0.0;
     unsigned long period_ns;
     static char *kwlist[] = {"channel", "pulse_width_ns", NULL};
@@ -173,6 +248,21 @@ static PyObject *py_set_pulse_width_ns(PyObject *self, PyObject *args, PyObject 
 
     if (!get_pwm_key(channel, key)) {
         PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -203,6 +293,7 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
 {
     char key[8];
     char *channel;
+    int allowed = -1;
     float frequency = 1.0;
     static char *kwlist[] = {"channel", "frequency", NULL};
 
@@ -221,6 +312,21 @@ static PyObject *py_set_frequency(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    }
+
     if (pwm_set_frequency(key, frequency) < 0) {
         char err[2000];
         snprintf(err, sizeof(err), "PWM: %s issue: (%s)", channel, get_error_msg());
@@ -236,6 +342,7 @@ static PyObject *py_set_period_ns(PyObject *self, PyObject *args, PyObject *kwar
 {
     char key[8];
     char *channel;
+    int allowed = -1;
     unsigned long period_ns = 2e6;
     static char *kwlist[] = {"channel", "period_ns", NULL};
 
@@ -251,6 +358,21 @@ static PyObject *py_set_period_ns(PyObject *self, PyObject *args, PyObject *kwar
 
     if (!get_pwm_key(channel, key)) {
         PyErr_SetString(PyExc_ValueError, "Invalid PWM key or name.");
+        return NULL;
+    }
+
+    // Check to see if PWM is allowed on the hardware
+    // A 1 means we're good to go
+    allowed = pwm_allowed(key);
+    if (allowed == -1) {
+        char err[2000];
+        snprintf(err, sizeof(err), "Error determining hardware. (%s)", get_error_msg());
+        PyErr_SetString(PyExc_ValueError, err);
+        return NULL;
+    } else if (allowed == 0) {
+        char err[2000];
+        snprintf(err, sizeof(err), "PWM %s not available on current Hardware", key);
+        PyErr_SetString(PyExc_ValueError, err);
         return NULL;
     }
 
@@ -275,6 +397,7 @@ PyMethodDef pwm_methods[] = {
     {"set_pulse_width_ns", (PyCFunction)py_set_pulse_width_ns, METH_VARARGS, "Change the period\npulse_width_ns - pulse width in nanoseconds" },
     {"cleanup", py_cleanup, METH_VARARGS, "Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection"},
     {"toggle_debug", py_toggle_debug, METH_VARARGS, "Toggles the enabling/disabling of Debug print output"},
+    {"is_chip_pro", py_is_chip_pro, METH_VARARGS, "Is hardware a CHIP Pro? Boolean False for normal CHIP/PocketCHIP (R8 SOC)"},
     {NULL, NULL, 0, NULL}
 };
 

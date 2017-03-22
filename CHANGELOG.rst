@@ -1,3 +1,59 @@
+0.5.6
+---
+* Fix for Issue #63 where re-setting up a pin wasn't lining up with RPi.GPIO standards. Calling setup after the first time will now update direction.
+* README updates to point out the direction() function since that was missing
+
+0.5.5
+---
+* Fix for Issue #62 where using alternate name of an XIO would cause a segfault due to trying to set pull up/down resistor setting
+
+0.5.4
+---
+* Re-enabled the polarity setting for PWM based upon Issue #61
+* Fixed a 1 letter bug was trying to write inverted to polarity when it wants inversed (such facepalm)
+* Cleaned up the polarity setting code to work when PWM is not enabled
+* Fixed the unit test for pwm to verify we can set polarity
+
+0.5.3
+---
+* Fixes to the PWM pytest
+* Added pytest for LRADC and Utilities
+* Makefile updates for all the things
+
+0.5.2
+---
+* Updating Utilties to determine CHIP Pro better
+* Updating the README to fix things
+
+0.5.0
+---
+* CHIP Pro Support
+* README Updates
+
+0.4.0
+---
+* Software Servo code added
+  - Only works on the LCD and CSI pins
+* Fixed cleanup() for the SOFTPWM and SERVO
+  - The per pin cleanup for SOFTPWM doesn't work as stop() clears up the memory for the pin used
+  - SERVO code was based on SOFTPWM, so it inherited this issue
+
+0.3.5
+---
+* Merged in brettcvz's code to read a byte of data from the GPIO
+  - Cleaned the code up and expanded it (in the low level C code) to read up to 32 bits of data
+  - Presented 8 bit and 16 bits of data functions to the Python interface with brettcvz's read_byte() and my read_word()
+* I think I finally fixed the GPIO.cleanup() code one and for all
+
+0.3.4.1
+---
+* Quick fix as I borked XIO setup as inputs with the latest change that enabled PUD
+
+0.3.4
+---
+* Pull Up/Pull Down resistor setting now available for the R8 GPIO.
+* Some general cleanup
+
 0.3.3
 ----
 * Added Debug printing for all the capabilities with the toggle_debug() function

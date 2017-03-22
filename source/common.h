@@ -56,6 +56,7 @@ SOFTWARE.
 #define BCM          11
 #define CHIP         0
 #define CHIPPRO      1
+#define BOTH         2
 
 // In the pins_t structure, the "base_method" field tells how
 // the "gpio" field should be interpreted.
@@ -68,11 +69,12 @@ typedef struct pins_t {
     const char *name;
     const char *altname; /* alternate name as referenced on pocketchip pin header */
     const char *key;
+    //const char *altkey; /* alternate key for chip pro */
     int gpio;           /* port number to use under /sys/class/gpio */
     int base_method;    /* modifier for port number; see BASE_METHOD_... */
     int pwm_mux_mode;   /* pwm pin */
     int ain;            /* analog pin */
-    int spwm_allow;     /* pin allowed for software pwm */
+    int sbc_type;     /* which sbc pin is allowed */
 } pins_t;
 
 
@@ -89,10 +91,15 @@ int module_setup;
 int DEBUG;
 
 int get_xio_base(void);
+int is_this_chippro(void);
 int gpio_number(pins_t *pin);
+int gpio_pud_capable(pins_t *pin);
 int lookup_gpio_by_key(const char *key);
 int lookup_gpio_by_name(const char *name);
 int lookup_gpio_by_altname(const char *altname);
+int lookup_pud_capable_by_key(const char *key);
+int lookup_pud_capable_by_name(const char *name);
+int lookup_pud_capable_by_altname(const char *altname);
 int lookup_ain_by_key(const char *key);
 int lookup_ain_by_name(const char *name);
 int copy_key_by_key(const char *input_key, char *key);
@@ -104,7 +111,6 @@ int get_key(const char *input, char *key);
 int get_pwm_key(const char *input, char *key);
 int get_adc_ain(const char *key, unsigned int *ain);
 int build_path(const char *partial_path, const char *prefix, char *full_path, size_t full_path_len);
-int get_spi_bus_path_number(unsigned int spi);
 void dyn_int_array_set(dyn_int_array_t **in_array, int i, int val, int initial_val);
 int dyn_int_array_get(dyn_int_array_t **in_array, int i, int initial_val);
 void dyn_int_array_delete(dyn_int_array_t **in_array);
@@ -112,3 +118,6 @@ void clear_error_msg(void);
 char *get_error_msg(void);
 void add_error_msg(char *msg);
 void toggle_debug(void);
+int compute_port_pin(const char *key, int gpio, int *port, int *pin);
+int gpio_allowed(int gpio);
+int pwm_allowed(const char *key);
